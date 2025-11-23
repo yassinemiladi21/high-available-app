@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin - Manage Content</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .hostname-badge {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 12px 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        font-size: 14px;
+        font-weight: 500;
+        color: #333;
+        z-index: 1000;
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(102, 126, 234, 0.3);
+      }
+
+      .hostname-badge .label {
+        color: #667eea;
+        font-weight: 600;
+        margin-right: 5px;
+      }
+
+      .hostname-badge .value {
+        color: #764ba2;
+        font-family: "Courier New", monospace;
+      }
+
+      .header {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      h1 {
+        color: #667eea;
+        margin-bottom: 10px;
+      }
+
+      .back-link {
+        display: inline-block;
+        color: #667eea;
+        text-decoration: none;
+        margin-top: 10px;
+        font-weight: 500;
+      }
+
+      .back-link:hover {
+        text-decoration: underline;
+      }
+
+      .form-section {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      h2 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        color: #555;
+        font-weight: 500;
+      }
+
+      input[type="text"],
+      textarea,
+      input[type="file"] {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        transition: border-color 0.3s;
+      }
+
+      input[type="text"]:focus,
+      textarea:focus,
+      input[type="file"]:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 100px;
+      }
+
+      input[type="file"] {
+        padding: 10px;
+        cursor: pointer;
+      }
+
+      .file-info {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #888;
+      }
+
+      .image-preview {
+        margin-top: 15px;
+        max-width: 300px;
+        border-radius: 8px;
+        display: none;
+      }
+
+      .image-preview img {
+        width: 100%;
+        border-radius: 8px;
+        border: 2px solid #e0e0e0;
+      }
+
+      button {
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.3s;
+      }
+
+      button:hover {
+        background: #5568d3;
+      }
+
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      .content-list {
+        background: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      .content-item {
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+        display: flex;
+        gap: 20px;
+        align-items: start;
+      }
+
+      .content-image {
+        width: 150px;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 8px;
+        flex-shrink: 0;
+      }
+
+      .content-details {
+        flex-grow: 1;
+      }
+
+      .content-quote {
+        color: #333;
+        font-style: italic;
+        margin-bottom: 10px;
+      }
+
+      .content-filename {
+        color: #888;
+        font-size: 12px;
+        word-break: break-all;
+      }
+
+      .delete-btn {
+        background: #e74c3c;
+        padding: 8px 20px;
+        font-size: 14px;
+      }
+
+      .delete-btn:hover {
+        background: #c0392b;
+      }
+
+      .message {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: none;
+      }
+
+      .message.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .message.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .message.show {
+        display: block;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 20px;
+        color: #667eea;
+      }
+
+      .loading.show {
+        display: block;
+      }
+
+      @media (max-width: 768px) {
+        .hostname-badge {
+          top: 10px;
+          right: 10px;
+          font-size: 12px;
+          padding: 8px 15px;
+        }
+
+        .content-item {
+          flex-direction: column;
+        }
+
+        .content-image {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hostname-badge">
+      <span class="label">Server:</span>
+      <span class="value" id="hostname">{{ hostname }}</span>
+    </div>
+
+    <div class="container">
+      <div class="header">
+        <h1>Content Management</h1>
+        <p>Upload images and add quotes for the welcome page</p>
+        <a href="/" class="back-link">← Back to Welcome Page</a>
+      </div>
+
+      <div class="form-section">
+        <h2>Add New Content</h2>
+        <div id="message" class="message"></div>
+        <form id="contentForm" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="quote">Quote:</label>
+            <textarea
+              id="quote"
+              name="quote"
+              required
+              placeholder="Enter an inspiring quote..."
+            ></textarea>
+          </div>
+          <div class="form-group">
+            <label for="image">Upload Image:</label>
+            <input
+              type="file"
+              id="image"
+              name="image"
+              accept="image/*"
+              required
+            />
+            <div class="file-info">
+              Max size: 5MB | Allowed: JPG, PNG, GIF, WEBP
+            </div>
+            <div class="image-preview" id="imagePreview">
+              <img src="" alt="Preview" />
+            </div>
+          </div>
+          <button type="submit" id="submitBtn">Add Content</button>
+          <div class="loading" id="loading">Uploading...</div>
+        </form>
+      </div>
+
+      <div class="content-list">
+        <h2>Existing Content</h2>
+        <div id="contentList"></div>
+      </div>
+    </div>
+
+    <script>
+      // Image preview
+      document.getElementById('image').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const preview = document.getElementById('imagePreview');
+            preview.querySelector('img').src = e.target.result;
+            preview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      async function loadContent() {
+        try {
+          const response = await fetch("/api/content");
+          const content = await response.json();
+
+          const listDiv = document.getElementById("contentList");
+          if (content.length === 0) {
+            listDiv.innerHTML =
+              '<p style="color: #888;">No content yet. Add your first quote and image!</p>';
+            return;
+          }
+
+          listDiv.innerHTML = content
+            .map(
+              (item) => `
+                    <div class="content-item">
+                        <img src="${item.image_url}" alt="Content image" class="content-image" onerror="this.src='https://via.placeholder.com/150x100?text=Image+Not+Found'">
+                        <div class="content-details">
+                            <div class="content-quote">"${item.quote}"</div>
+                            <div class="content-filename">File: ${item.image_filename}</div>
+                        </div>
+                        <button class="delete-btn" onclick="deleteContent(${item.id})">Delete</button>
+                    </div>
+                `
+            )
+            .join("");
+        } catch (error) {
+          console.error("Error loading content:", error);
+        }
+      }
+
+      async function deleteContent(id) {
+        if (!confirm("Are you sure you want to delete this content?")) return;
+
+        try {
+          await fetch(`/api/content/${id}`, { method: "DELETE" });
+          showMessage("Content deleted successfully!", "success");
+          loadContent();
+        } catch (error) {
+          showMessage("Error deleting content", "error");
+        }
+      }
+
+      function showMessage(text, type) {
+        const messageDiv = document.getElementById("message");
+        messageDiv.textContent = text;
+        messageDiv.className = `message ${type} show`;
+        setTimeout(() => {
+          messageDiv.classList.remove("show");
+        }, 3000);
+      }
+
+      document.getElementById("contentForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData();
+        const quote = document.getElementById("quote").value;
+        const imageFile = document.getElementById("image").files[0];
+
+        if (!imageFile) {
+          showMessage("Please select an image", "error");
+          return;
+        }
+
+        // Check file size
+        if (imageFile.size > 5 * 1024 * 1024) {
+          showMessage("Image size must be less than 5MB", "error");
+          return;
+        }
+
+        formData.append("quote", quote);
+        formData.append("image", imageFile);
+
+        const submitBtn = document.getElementById("submitBtn");
+        const loading = document.getElementById("loading");
+        
+        submitBtn.disabled = true;
+        loading.classList.add("show");
+
+        try {
+          const response = await fetch("/api/content", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (response.ok) {
+            showMessage("Content added successfully!", "success");
+            document.getElementById("contentForm").reset();
+            document.getElementById("imagePreview").style.display = "none";
+            loadContent();
+          } else {
+            const error = await response.json();
+            showMessage(error.error || "Error adding content", "error");
+          }
+        } catch (error) {
+          showMessage("Error adding content: " + error.message, "error");
+        } finally {
+          submitBtn.disabled = false;
+          loading.classList.remove("show");
+        }
+      });
+
+      loadContent();
+    </script>
+  </body>
+</html>
