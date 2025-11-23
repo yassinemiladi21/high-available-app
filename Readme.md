@@ -1,5 +1,7 @@
 # High Availability Web Application - Complete Documentation
 
+##This project was created by: Azza Mechken, Moataz Khabbouchi & Yassine Miladi 
+
 ## 📋 Table of Contents
 
 1. [Project Overview](#project-overview)
@@ -357,37 +359,6 @@ ip addr show enp0s8  # Verify IP
 | DB Primary | 192.168.104.31 | PostgreSQL master |
 | DB Replica | 192.168.104.32 | PostgreSQL standby |
 
-### Hostname Configuration
-
-**Set Hostnames**:
-
-```bash
-# Load Balancer
-sudo hostnamectl set-hostname lb-vm
-
-# App VMs
-sudo hostnamectl set-hostname app-vm-01
-sudo hostnamectl set-hostname app-vm-02
-
-# DB VMs
-sudo hostnamectl set-hostname db-primary
-sudo hostnamectl set-hostname db-replica
-```
-
-**Update `/etc/hosts`** on all VMs:
-
-```
-127.0.0.1       localhost
-127.0.1.1       [hostname]
-
-192.168.104.10  lb-vm
-192.168.104.21  app-vm-01
-192.168.104.22  app-vm-02
-192.168.104.31  db-primary
-192.168.104.32  db-replica
-```
-
----
 
 ## 💾 Database Replication
 
@@ -422,50 +393,8 @@ sudo hostnamectl set-hostname db-replica
 - Slower writes but zero data loss
 - Enable by setting `synchronous_standby_names` in postgresql.conf
 
-### Monitoring Replication
 
-**On Primary**:
 
-```bash
-sudo -u postgres psql << 'EOF'
-SELECT 
-    client_addr,
-    state,
-    sent_lsn,
-    write_lsn,
-    replay_lsn,
-    sync_state
-FROM pg_stat_replication;
-EOF
-```
-
-**Output Example**:
-```
- client_addr    | state     | sent_lsn  | write_lsn | replay_lsn | sync_state
-----------------+-----------+-----------+-----------+------------+------------
- 192.168.104.32 | streaming | 0/3000148 | 0/3000148 | 0/3000148  | async
-```
-
-**On Replica**:
-
-```bash
-sudo -u postgres psql -c "SELECT pg_last_wal_receive_lsn(), pg_last_wal_replay_lsn();"
-```
-
-### Replication Lag
-
-**Calculate Lag**:
-
-```bash
-# On Replica
-sudo -u postgres psql << 'EOF'
-SELECT 
-    EXTRACT(EPOCH FROM (NOW() - pg_last_xact_replay_timestamp()))::INT 
-    AS lag_seconds;
-EOF
-```
-
-**Healthy System**: Lag < 1 second
 
 ### Failover Process
 
@@ -476,22 +405,6 @@ EOF
 3. **Read-Only Mode**: Replica can serve reads but not writes
 4. **Promotion** (Manual): Promote replica to primary
 
-**Promote Replica to Primary**:
-
-```bash
-# On Replica VM
-sudo -u postgres /usr/lib/postgresql/16/bin/pg_ctl promote -D /var/lib/postgresql/16/main
-
-# Or using systemctl
-sudo systemctl restart postgresql
-
-# Remove standby.signal to make it primary
-sudo rm /var/lib/postgresql/16/main/standby.signal
-sudo systemctl restart postgresql
-
-# Verify it's now writable
-sudo -u postgres psql -c "SELECT pg_is_in_recovery();"  # Should return 'f'
-```
 
 **Update App Configuration**:
 
@@ -571,36 +484,6 @@ Down Server (Red) → Removed from pool
 Healthy Server (Green) → Added back to pool
 ```
 
-### Session Persistence (Optional)
-
-To ensure users stay on the same server (for sessions):
-
-```haproxy
-backend app_servers
-    balance roundrobin
-    cookie SERVERID insert indirect nocache
-    server app1 192.168.104.21:5000 check cookie app1
-    server app2 192.168.104.22:5000 check cookie app2
-```
-
-### Monitoring HAProxy
-
-**Access Statistics Page**:
-```
-http://192.168.104.10:8080/stats
-```
-
-**Key Metrics**:
-- **Queue**: Requests waiting for available server
-- **Session Rate**: Requests per second
-- **Status**: UP/DOWN for each backend
-- **Downtime**: Total time server was down
-
-**Command Line Stats**:
-
-```bash
-echo "show stat" | sudo socat stdio /var/run/haproxy/admin.sock
-```
 
 ---
 
@@ -711,36 +594,6 @@ sudo mount -a
 df -h | grep images
 ```
 
-### NFS Performance Tuning
-
-**For Better Performance** (add to mount options in `/etc/fstab`):
-
-```
-192.168.104.10:/srv/nfs/images /mnt/shared/images nfs rsize=8192,wsize=8192,timeo=14,intr 0 0
-```
-
-- `rsize=8192`: Read buffer size
-- `wsize=8192`: Write buffer size
-- `timeo=14`: Timeout (seconds * 10)
-- `intr`: Allow interrupts
-
-### NFS Security
-
-**Firewall Rules** (on NFS Server):
-
-```bash
-sudo ufw allow from 192.168.104.21 to any port nfs
-sudo ufw allow from 192.168.104.22 to any port nfs
-```
-
-**Check NFS Status**:
-
-```bash
-sudo systemctl status nfs-kernel-server
-sudo exportfs -v                    # Show current exports
-showmount -a                        # Show mounted clients
-```
-
 ---
 
 ## 🐍 Application Logic
@@ -748,13 +601,11 @@ showmount -a                        # Show mounted clients
 ### Application Structure
 
 ```
-app/
+welcome_app/
 ├── app.py                 # Main Flask application
 ├── templates/
 │   ├── welcome.html       # Main page (displays quotes)
 │   └── admin.html         # Admin page (upload content)
-├── static/                # (Optional) CSS/JS files
-└── requirements.txt       # Python dependencies
 ```
 
 ### Key Application Functions
@@ -875,7 +726,7 @@ log("✗ Cannot connect to DB2: Connection refused")
 
 ```bash
 # If running as systemd service
-sudo journalctl -u quotes-app -f
+sudo journalctl -u welcome_app -f
 
 # If running directly
 python3 app.py
@@ -1003,30 +854,8 @@ sudo mkdir -p /mnt/shared/images
 sudo mount 192.168.104.10:/srv/nfs/images /mnt/shared/images
 echo "192.168.104.10:/srv/nfs/images /mnt/shared/images nfs defaults 0 0" | sudo tee -a /etc/fstab
 
-# Create app directory
-mkdir -p ~/app
-cd ~/app
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install Python packages
-pip install flask flask-cors psycopg2-binary
-
-# Create app.py
-nano app.py
-# (paste application code)
-
-# Create templates directory
-mkdir templates
-nano templates/welcome.html
-# (paste HTML code)
-nano templates/admin.html
-# (paste HTML code)
-
 # Create systemd service
-sudo nano /etc/systemd/system/quotes-app.service
+sudo nano /etc/systemd/system/welcome_app.service
 ```
 
 **Service File**:
@@ -1037,13 +866,12 @@ Description=Flask Quotes App
 After=network.target
 
 [Service]
-Type=simple
-User=your_username
-WorkingDirectory=/home/your_username/app
-Environment="PATH=/home/your_username/app/venv/bin"
-ExecStart=/home/your_username/app/venv/bin/python app.py
+User=root
+WorkingDirectory=/home/user/welcome_app
+Environment="PATH=/home/user/welcome_app"
+ExecStart=/usr/bin/python3 /home/user/welcome_app/app.py
 Restart=always
-RestartSec=10
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
@@ -1053,24 +881,9 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl start quotes-app
-sudo systemctl enable quotes-app
-sudo systemctl status quotes-app
-```
-
-#### 6. Verify Deployment
-
-```bash
-# Check all services
-curl http://192.168.104.10              # Should show welcome page
-curl http://192.168.104.10/api/health   # Should return JSON
-curl http://192.168.104.10:8080/stats   # HAProxy stats
-
-# Check databases
-ssh user@192.168.104.31 "sudo -u postgres psql -c 'SELECT * FROM pg_stat_replication;'"
-
-# Check NFS
-df -h | grep images                     # On app VMs
+sudo systemctl start welcome_app
+sudo systemctl enable welcome_app
+sudo systemctl status welcome_app
 ```
 
 ---
@@ -1107,10 +920,10 @@ ssh user@192.168.104.22 "ls /mnt/shared/images/"
 watch -n 1 'curl -s http://192.168.104.10/api/health | jq .hostname'
 
 # Output alternates:
-# "app-vm-01"
-# "app-vm-02"
-# "app-vm-01"
-# "app-vm-02"
+# "app-01"
+# "app-02"
+# "app-01"
+# "app-02"
 ```
 
 #### Test 3: Database Replication
@@ -1135,7 +948,7 @@ sudo -u postgres psql -d welcome_app -c "SELECT COUNT(*) FROM content;"
 ssh user@192.168.104.31 "sudo systemctl stop postgresql"
 
 # 2. Check app logs (should show failover)
-sudo journalctl -u quotes-app -f
+sudo journalctl -u welcome_app -f
 # Output: "✗ Cannot connect to DB1"
 #         "✓ Failover successful to DB2"
 
@@ -1149,361 +962,9 @@ curl http://192.168.104.10/api/content
 ssh user@192.168.104.31 "sudo systemctl start postgresql"
 ```
 
-#### Test 5: App Server Failover
-
-```bash
-# 1. Check current backend status
-curl http://192.168.104.10:8080/stats
-
-# 2. Stop one app server
-ssh user@192.168.104.21 "sudo systemctl stop quotes-app"
-
-# 3. HAProxy marks it DOWN
-# Wait 10 seconds, check stats again
-curl http://192.168.104.10:8080/stats
-
-# 4. All traffic goes to remaining server
-curl http://192.168.104.10
-# Still works!
-
-# 5. Restart app server
-ssh user@192.168.104.21 "sudo systemctl start quotes-app"
-
-# 6. HAProxy marks it UP (after 2 health checks = 6 seconds)
-```
-
-### Performance Testing
-
-#### Load Test with Apache Bench
-
-```bash
-# Install Apache Bench
-sudo apt install apache2-utils -y
-
-# Test 1000 requests, 10 concurrent
-ab -n 1000 -c 10 http://192.168.104.10/
-
-# Check results
-# - Requests per second
-# - Time per request
-# - Failed requests (should be 0)
-```
-
-#### Database Performance
-
-```bash
-# Connection test
-time PGPASSWORD='postgres' psql -h 192.168.104.31 -U postgres -d welcome_app -c "SELECT 1;"
-
-# Query performance
-PGPASSWORD='postgres' psql -h 192.168.104.31 -U postgres -d welcome_app << 'EOF'
-EXPLAIN ANALYZE SELECT * FROM content ORDER BY created_at DESC LIMIT 10;
-EOF
-```
-
-### Monitoring Commands
-
-#### System Health Check Script
-
-```bash
-#!/bin/bash
-# Save as: monitor.sh
-
-echo "=== High Availability System Monitor ==="
-echo ""
-echo "Timestamp: $(date)"
-echo ""
-
-# HAProxy Status
-echo "--- HAProxy Backend Status ---"
-curl -s http://192.168.104.10:8080/stats | grep "app_servers" -A 10 | head -20
-
-# App Servers Health
-echo -e "\n--- App Server 1 ---"
-curl -s http://192.168.104.21:5000/api/health 2>/dev/null | jq . || echo "DOWN"
-
-echo -e "\n--- App Server 2 ---"
-curl -s http://192.168.104.22:5000/api/health 2>/dev/null | jq . || echo "DOWN"
-
-# Database Replication
-echo -e "\n--- Database Replication ---"
-ssh user@192.168.104.31 'sudo -u postgres psql -t -c "SELECT client_addr, state, replay_lsn FROM pg_stat_replication;"' 2>/dev/null || echo "Primary DOWN"
-
-echo -e "\n--- Database Replica Status ---"
-ssh user@192.168.104.32 'sudo -u postgres psql -t -c "SELECT pg_is_in_recovery();"' 2>/dev/null || echo "Replica DOWN"
-
-# NFS Status
-echo -e "\n--- NFS Mounts ---"
-ssh user@192.168.104.21 "df -h | grep images" 2>/dev/null || echo "App VM 1 NFS DOWN"
-ssh user@192.168.104.22 "df -h | grep images" 2>/dev/null || echo "App VM 2 NFS DOWN"
-
-echo ""
-echo "=== Monitor Complete ==="
-```
-
-**Run Monitor**:
-
-```bash
-chmod +x monitor.sh
-./monitor.sh
-
-# Run continuously
-watch -n 10 ./monitor.sh
-```
-
-#### Key Metrics to Track
-
-| Metric | Command | Healthy Value |
-|--------|---------|---------------|
-| HAProxy Backend UP | Check stats page | 2/2 servers UP |
-| DB Replication Lag | `pg_stat_replication` | < 1 second |
-| NFS Mount | `df -h \| grep images` | Mounted on both |
-| App Response Time | `curl -w "%{time_total}"` | < 0.5 seconds |
-| Database Connections | `pg_stat_activity` | < 80% of max |
-
-### Log Files
-
-```bash
-# HAProxy logs
-sudo tail -f /var/log/haproxy.log
-
-# PostgreSQL logs
-sudo tail -f /var/log/postgresql/postgresql-16-main.log
-
-# Flask app logs
-sudo journalctl -u quotes-app -f
-
-# NFS logs
-sudo tail -f /var/log/syslog | grep nfs
-
-# System logs
-sudo tail -f /var/log/syslog
-```
-
 ---
 
-## 🔧 Troubleshooting
 
-### Common Issues
-
-#### Issue 1: NFS Mount Fails
-
-**Symptoms**:
-```
-mount.nfs: Connection refused
-```
-
-**Solutions**:
-
-```bash
-# On NFS Server
-sudo systemctl status nfs-kernel-server
-sudo exportfs -ra
-sudo exportfs -v
-
-# Check firewall
-sudo ufw allow from 192.168.104.0/24 to any port nfs
-
-# On NFS Client
-showmount -e 192.168.104.10
-ping 192.168.104.10
-
-# Force remount
-sudo umount /mnt/shared/images
-sudo mount -v 192.168.104.10:/srv/nfs/images /mnt/shared/images
-```
-
-#### Issue 2: Database Connection Fails
-
-**Symptoms**:
-```
-psycopg2.OperationalError: could not connect to server
-```
-
-**Solutions**:
-
-```bash
-# Check PostgreSQL is running
-ssh user@192.168.104.31 "sudo systemctl status postgresql"
-
-# Check listening on network
-ssh user@192.168.104.31 "sudo netstat -tlnp | grep 5432"
-
-# Test connection from app server
-PGPASSWORD='postgres' psql -h 192.168.104.31 -U postgres -d welcome_app -c "SELECT 1;"
-
-# Check pg_hba.conf
-ssh user@192.168.104.31 "sudo grep '^host' /etc/postgresql/16/main/pg_hba.conf"
-
-# Reload PostgreSQL config
-ssh user@192.168.104.31 "sudo systemctl reload postgresql"
-```
-
-#### Issue 3: Replication Not Working
-
-**Symptoms**:
-```
-pg_stat_replication is empty
-```
-
-**Solutions**:
-
-```bash
-# On Primary - Check replication user exists
-sudo -u postgres psql -c "\du replicator"
-
-# Check replication connections allowed
-sudo grep "replication" /etc/postgresql/16/main/pg_hba.conf
-
-# On Replica - Check standby.signal exists
-ls -la /var/lib/postgresql/16/main/standby.signal
-
-# Check replica logs
-sudo tail -50 /var/log/postgresql/postgresql-16-main.log
-
-# Restart replication
-ssh user@192.168.104.32 "sudo systemctl restart postgresql"
-```
-
-#### Issue 4: HAProxy Shows Backend DOWN
-
-**Symptoms**:
-- Stats page shows red (DOWN) for app server
-
-**Solutions**:
-
-```bash
-# Check app is running
-ssh user@192.168.104.21 "sudo systemctl status quotes-app"
-
-# Test health endpoint directly
-curl http://192.168.104.21:5000/api/health
-
-# Check app logs
-ssh user@192.168.104.21 "sudo journalctl -u quotes-app -n 50"
-
-# Restart app
-ssh user@192.168.104.21 "sudo systemctl restart quotes-app"
-
-# Check HAProxy logs
-sudo tail -50 /var/log/haproxy.log | grep "Health check"
-```
-
-#### Issue 5: Images Not Loading
-
-**Symptoms**:
-- 404 error for `/images/filename.jpg`
-
-**Solutions**:
-
-```bash
-# Check NFS is mounted
-df -h | grep images
-
-# Check file exists
-ls -la /mnt/shared/images/
-
-# Check permissions
-ls -la /mnt/shared/images/ | grep filename.jpg
-
-# Test direct file access
-curl http://192.168.104.21:5000/images/filename.jpg
-
-# Check Flask route
-ssh user@192.168.104.21 "sudo journalctl -u quotes-app | grep images"
-```
-
-#### Issue 6: Application Can't Write to Database
-
-**Symptoms**:
-```
-ERROR: cannot execute INSERT in a read-only transaction
-```
-
-**Cause**: Connected to replica instead of primary
-
-**Solutions**:
-
-```bash
-# Check which DB app is using
-curl http://192.168.104.21:5000/api/health | jq .db_host
-
-# If it shows replica, check primary status
-ssh user@192.168.104.31 "sudo systemctl status postgresql"
-ssh user@192.168.104.31 "sudo -u postgres psql -c 'SELECT pg_is_in_recovery();'"
-
-# Should return 'f' (false) for primary
-# If returns 't', need to promote it
-
-# Promote replica to primary
-ssh user@192.168.104.31 "sudo rm /var/lib/postgresql/16/main/standby.signal"
-ssh user@192.168.104.31 "sudo systemctl restart postgresql"
-```
-
-### Debug Mode
-
-**Enable Detailed Logging** in `app.py`:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Add to get_db() function
-log(f"Attempting connection to {cfg['host']}:{cfg['port']}")
-log(f"Connection successful, checking read-only status...")
-```
-
-**Run App in Foreground** (for debugging):
-
-```bash
-sudo systemctl stop quotes-app
-cd ~/app
-source venv/bin/activate
-python app.py
-# Watch console output
-```
-
-### Recovery Procedures
-
-#### Recover from Primary DB Failure
-
-```bash
-# 1. Promote replica to primary
-ssh user@192.168.104.32 << 'EOF'
-sudo systemctl stop postgresql
-sudo rm /var/lib/postgresql/16/main/standby.signal
-sudo systemctl start postgresql
-sudo -u postgres psql -c "SELECT pg_is_in_recovery();"  # Should be 'f'
-EOF
-
-# 2. Update app configuration
-# Edit DB_CONFIGS to swap primary/replica IPs
-
-# 3. Restart apps
-ssh user@192.168.104.21 "sudo systemctl restart quotes-app"
-ssh user@192.168.104.22 "sudo systemctl restart quotes-app"
-
-# 4. Fix old primary and make it replica
-# (rebuild from new primary using pg_basebackup)
-```
-
-#### Rebuild Replica from Primary
-
-```bash
-# On old/broken replica
-ssh user@192.168.104.32 << 'EOF'
-sudo systemctl stop postgresql
-sudo rm -rf /var/lib/postgresql/16/main/*
-sudo -u postgres pg_basebackup \
-    -h 192.168.104.31 \
-    -U replicator \
-    -D /var/lib/postgresql/16/main \
-    -P -R --wal-method=stream
-sudo systemctl start postgresql
-EOF
-```
-
----
 
 ## 📊 Architecture Decisions
 
@@ -1533,9 +994,7 @@ EOF
 - **Single Points of Failure**:
   - Load Balancer (can be mitigated with Keepalived/VRRP)
   - NFS Server (can use distributed storage like GlusterFS)
-  
-- **Manual Failover**: DB promotion requires manual intervention
-  
+    
 - **Scalability**: Limited by physical resources
   
 - **No Auto-Scaling**: Must manually add/remove app servers
