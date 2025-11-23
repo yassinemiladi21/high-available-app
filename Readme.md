@@ -1,6 +1,6 @@
 # High Availability Web Application - Complete Documentation
 
-##This project was created by: Azza Mechken, Moataz Khabbouchi & Yassine Miladi 
+## This project was created by: Azza Mechken, Moataz Khabbouchi & Yassine Miladi 
 
 ## 📋 Table of Contents
 
@@ -13,8 +13,6 @@
 7. [Shared Storage (NFS)](#shared-storage-nfs)
 8. [Application Logic](#application-logic)
 9. [Deployment Guide](#deployment-guide)
-10. [Testing & Monitoring](#testing--monitoring)
-11. [Troubleshooting](#troubleshooting)
 
 ---
 
